@@ -8,62 +8,60 @@ import datetime
 
 # --- Page Configuration ---
 st.set_page_config(
-    page_title="Hanoi Traffic & Mobility Platform",
-    page_icon="🚘",
+    page_title="TNS Traffic & Mobility Portal",
+    page_icon="🏫",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# --- Custom Municipal Dashboard Styling ---
+# --- Custom Styling ---
 st.markdown("""
     <style>
     .stApp { background-color: #f8fafc; }
-    .main-header { font-size: 24px; font-weight: 700; color: #0f172a; letter-spacing: -0.5px; }
+    .main-header { font-size: 24px; font-weight: 700; color: #1e293b; letter-spacing: -0.5px; }
     .sub-header { font-size: 13px; color: #64748b; margin-bottom: 20px; }
-    .metric-card { background-color: #ffffff; border: 1px solid #e2e8f0; padding: 12px; border-radius: 6px; }
+    .highlight { color: #2563eb; font-weight: bold; }
     </style>
 """, unsafe_allow_html=True)
 
 # --- Header ---
-st.markdown('<div class="main-header">HANOI MUNICIPAL TRAFFIC & MOBILITY PLATFORM</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-header">Real-time Traffic Monitoring, Weather-adjusted Predictive Analytics, and Point-to-Point Route Optimization</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header">🏫 TRUE NORTH INTERNATIONAL SCHOOL (TNS) TRAFFIC PORTAL</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-header">Real-time Traffic Monitoring & Predictive Route Planner for Mỗ Lao, Hà Đông Area</div>', unsafe_allow_html=True)
 
-# --- Default API Key Configuration ---
+# --- Default API Key ---
 DEFAULT_API_KEY = "6a382ec4-fa1c-4046-8e9c-2945cd81610b"
 
-# --- Key Nodes in Hanoi Metropolitan Area ---
+# --- True North School & Key Nearby Locations (Ha Dong) ---
+TNS_COORDS = [20.9835, 105.7865]
+
 HANOI_NODES = {
-    "Hà Đông Center": [20.9712, 105.7766],
-    "Cầu Giấy District": [21.0362, 105.7906],
-    "Hoàn Kiếm (Old Quarter)": [21.0285, 105.8542],
-    "Nam Từ Liêm (Mỹ Đình)": [21.0172, 105.7708],
-    "Thanh Xuân Interchange": [20.9982, 105.8055],
-    "Ba Đình Hub": [21.0341, 105.8318],
-    "Tây Hồ (West Lake South)": [21.0505, 105.8200],
-    "Hai Bà Trưng Zone": [21.0100, 105.8500]
+    "🏫 True North Int'l School (TNS Campus)": [20.9835, 105.7865],
+    "🚉 Mỗ Lao Metro Station (Trần Phú)": [20.9785, 105.7890],
+    "🚦 Tố Hữu - Vũ Trọng Khánh Junction": [20.9850, 105.7830],
+    "🛍️ AEON Mall Hà Đông": [20.9880, 105.7580],
+    "🌳 Văn Quán Lake Park": [20.9740, 105.7920],
+    "🏢 Thanh Xuân Interchange (Ring Road 3)": [20.9982, 105.8055],
+    "🏛️ Ba Đình / Old Quarter Center": [21.0285, 105.8542],
+    "🏢 Cầu Giấy District Hub": [21.0362, 105.7906]
 }
 
-# --- Major Arterial Corridors ---
+# --- School Surrounding Arterial Corridors ---
 HANOI_CORRIDORS = {
-    "Trần Phú - Nguyễn Trãi Corridor": {
-        "coords": [[20.9712, 105.7766], [20.9830, 105.7920], [20.9982, 105.8055]],
-        "base_density": 82
+    "Vũ Trọng Khánh (TNS Main School Front Road)": {
+        "coords": [[20.9785, 105.7890], [20.9835, 105.7865], [20.9850, 105.7830]],
+        "base_density": 85
     },
-    "Tố Hữu - Lê Văn Lương Axis": {
-        "coords": [[20.9690, 105.7500], [20.9780, 105.7680], [21.0030, 105.8000]],
+    "Tố Hữu Arterial Axis (Mỗ Lao Intersection)": {
+        "coords": [[20.9780, 105.7680], [20.9850, 105.7830], [20.9910, 105.7950]],
+        "base_density": 80
+    },
+    "Trần Phú Avenue (Hà Đông Main Link)": {
+        "coords": [[20.9712, 105.7766], [20.9785, 105.7890], [20.9830, 105.7920]],
         "base_density": 75
     },
-    "Ring Road 3 Elevated Arterial": {
-        "coords": [[20.9982, 105.8055], [21.0172, 105.7708], [21.0362, 105.7906]],
-        "base_density": 88
-    },
-    "Kim Mã - Nguyễn Thái Học Central Link": {
-        "coords": [[21.0341, 105.8318], [21.0300, 105.8420], [21.0285, 105.8542]],
-        "base_density": 60
-    },
-    "Võ Chí Công - West Lake Highway": {
-        "coords": [[21.0362, 105.7906], [21.0505, 105.8200], [21.0750, 105.8150]],
-        "base_density": 38
+    "Nguyễn Văn Lộc Food & Commercial Street": {
+        "coords": [[20.9785, 105.7890], [20.9820, 105.7880], [20.9860, 105.7870]],
+        "base_density": 65
     }
 }
 
@@ -100,15 +98,16 @@ now = datetime.datetime.now()
 target_time = now + datetime.timedelta(minutes=forecast_mins)
 target_hour = target_time.hour
 
-# Peak Hour Weighting
-peak_multiplier = 1.35 if (7 <= target_hour <= 9 or 17 <= target_hour <= 19) else 1.0
-base_network_index = min(100, int(38 * peak_multiplier * weather_factor))
+# School Pick-up / Drop-off Peak Hour Weighting (7-9 AM, 3-6 PM)
+is_school_peak = (7 <= target_hour <= 9 or 15 <= target_hour <= 18)
+peak_multiplier = 1.40 if is_school_peak else 1.0
+base_network_index = min(100, int(40 * peak_multiplier * weather_factor))
 
 # Navigation Tabs
-tab1, tab2 = st.tabs(["🗺️ Citywide Real-Time & Predictive Traffic Map", "🚗 Point-to-Point Route Duration Planner"])
+tab1, tab2 = st.tabs(["🗺️ TNS Vicinity Live & Predictive Traffic Map", "🚗 School Commute Route Planner"])
 
 # ==========================================
-# TAB 1: CITYWIDE TRAFFIC MAP
+# TAB 1: VICINITY TRAFFIC MAP
 # ==========================================
 with tab1:
     col_map, col_info = st.columns([2.2, 1])
@@ -141,9 +140,19 @@ with tab1:
         })
 
     with col_map:
-        st.subheader(f"Hanoi Metropolitan Traffic Map ({target_time.strftime('%H:%M')} Target)")
-        m = folium.Map(location=[21.0150, 105.8150], zoom_start=12, tiles="cartodbpositron")
+        st.subheader(f"True North School Vicinity Traffic ({target_time.strftime('%H:%M')} Target)")
         
+        # Center directly on True North International School with close zoom
+        m = folium.Map(location=TNS_COORDS, zoom_start=15, tiles="cartodbpositron")
+        
+        # Mark True North International School
+        folium.Marker(
+            TNS_COORDS,
+            popup="<b>True North International School</b><br>Mo Lao, Ha Dong",
+            tooltip="🏫 True North School Campus",
+            icon=folium.Icon(color="red", icon="star")
+        ).add_to(m)
+
         # Inject Live Traffic Tile Overlay if API Key exists & real-time mode selected
         if api_key and forecast_mins == 0:
             traffic_tile_url = f"https://api.tomtom.com/traffic/map/4/tile/flow/relative0/{{z}}/{{x}}/{{y}}.png?key={api_key}"
@@ -160,7 +169,7 @@ with tab1:
                 folium.PolyLine(
                     locations=c["raw_coords"],
                     color=c["raw_color"],
-                    weight=7,
+                    weight=8,
                     opacity=0.85,
                     tooltip=f"<b>{c['Corridor Name']}</b><br>Status: {c['Flow Status']}<br>Speed: {c['Est Speed']}"
                 ).add_to(m)
@@ -168,7 +177,7 @@ with tab1:
         st_folium(m, width=820, height=520)
 
     with col_info:
-        st.subheader("Corridor Metrics")
+        st.subheader("School Road Metrics")
         df_display = pd.DataFrame(corridor_summary)[["Corridor Name", "Congestion Index", "Flow Status", "Est Speed"]]
         st.dataframe(df_display, hide_index=True, use_container_width=True)
         
@@ -177,20 +186,22 @@ with tab1:
         * 🔵 **BLUE:** Free Flow (> 35 km/h)
         * 🟡 **YELLOW:** Moderate Density (20 - 35 km/h)
         * 🔴 **RED:** Heavy Congestion (< 20 km/h)
+        
+        *🏫 **School Peak Hours:** 07:00-09:00 & 15:00-18:00*
         """)
 
 # ==========================================
-# TAB 2: POINT-TO-POINT ROUTE PLANNER (FROM -> TO)
+# TAB 2: COMMUTE ROUTE PLANNER
 # ==========================================
 with tab2:
-    st.subheader("📍 Point-to-Point Driving Route Estimator")
-    st.write("Real-time network routing for travel distance, speed, and time delays across Hanoi.")
+    st.subheader("📍 TNS Commute & Driving Route Planner")
+    st.write("Calculate driving distance, estimated travel time, and delays to/from True North International School.")
     
     col_from, col_to = st.columns(2)
     with col_from:
         origin = st.selectbox("Origin (From):", list(HANOI_NODES.keys()), index=0)
     with col_to:
-        destination = st.selectbox("Destination (To):", list(HANOI_NODES.keys()), index=2)
+        destination = st.selectbox("Destination (To):", list(HANOI_NODES.keys()), index=1)
         
     if origin == destination:
         st.warning("Please select two distinct locations to calculate route metrics.")
@@ -198,7 +209,7 @@ with tab2:
         orig_coords = HANOI_NODES[origin]
         dest_coords = HANOI_NODES[destination]
         
-        # Real OSRM Global Driving Engine API
+        # Real OSRM Driving Engine API
         osrm_url = f"http://router.project-osrm.org/route/v1/driving/{orig_coords[1]},{orig_coords[0]};{dest_coords[1]},{dest_coords[0]}?overview=full&geometries=geojson"
         
         try:
@@ -225,7 +236,7 @@ with tab2:
                 # Render Route Map
                 route_map = folium.Map(
                     location=[(orig_coords[0]+dest_coords[0])/2, (orig_coords[1]+dest_coords[1])/2],
-                    zoom_start=13,
+                    zoom_start=14,
                     tiles="cartodbpositron"
                 )
                 
