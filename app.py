@@ -20,13 +20,12 @@ st.markdown("""
     .stApp { background-color: #f8fafc; }
     .main-header { font-size: 24px; font-weight: 700; color: #1e293b; letter-spacing: -0.5px; }
     .sub-header { font-size: 13px; color: #64748b; margin-bottom: 20px; }
-    .highlight { color: #2563eb; font-weight: bold; }
     </style>
 """, unsafe_allow_html=True)
 
 # --- Header ---
 st.markdown('<div class="main-header">🏫 TRUE NORTH INTERNATIONAL SCHOOL (TNS) TRAFFIC PORTAL</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-header">Real-time Traffic Monitoring & Predictive Route Planner for Mỗ Lao, Hà Đông Area</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-header">Detailed Google Maps View with Real-time Traffic Overlay & Commute Analytics</div>', unsafe_allow_html=True)
 
 # --- Default API Key ---
 DEFAULT_API_KEY = "6a382ec4-fa1c-4046-8e9c-2945cd81610b"
@@ -47,7 +46,7 @@ HANOI_NODES = {
 
 # --- School Surrounding Arterial Corridors ---
 HANOI_CORRIDORS = {
-    "Vũ Trọng Khánh (TNS Main School Front Road)": {
+    "Vũ Trọng Khánh (TNS Main Front Road)": {
         "coords": [[20.9785, 105.7890], [20.9835, 105.7865], [20.9850, 105.7830]],
         "base_density": 85
     },
@@ -98,7 +97,7 @@ now = datetime.datetime.now()
 target_time = now + datetime.timedelta(minutes=forecast_mins)
 target_hour = target_time.hour
 
-# School Pick-up / Drop-off Peak Hour Weighting (7-9 AM, 3-6 PM)
+# School Peak Hours Weighting
 is_school_peak = (7 <= target_hour <= 9 or 15 <= target_hour <= 18)
 peak_multiplier = 1.40 if is_school_peak else 1.0
 base_network_index = min(100, int(40 * peak_multiplier * weather_factor))
@@ -142,9 +141,25 @@ with tab1:
     with col_map:
         st.subheader(f"True North School Vicinity Traffic ({target_time.strftime('%H:%M')} Target)")
         
-        # Center directly on True North International School with close zoom
-        m = folium.Map(location=TNS_COORDS, zoom_start=15, tiles="cartodbpositron")
+        # Initialize Base Map centered on True North School with high detail
+        m = folium.Map(location=TNS_COORDS, zoom_start=16, tiles=None)
         
+        # Add Google Maps Standard Tile Layer (High Detail)
+        folium.TileLayer(
+            tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+            attr="Google Maps",
+            name="🗺️ Google Maps (Detailed Road View)",
+            overlay=False
+        ).add_to(m)
+
+        # Add Google Maps Satellite Layer
+        folium.TileLayer(
+            tiles="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+            attr="Google Maps",
+            name="🛰️ Google Maps (Satellite Hybrid)",
+            overlay=False
+        ).add_to(m)
+
         # Mark True North International School
         folium.Marker(
             TNS_COORDS,
@@ -159,7 +174,7 @@ with tab1:
             folium.TileLayer(
                 tiles=traffic_tile_url,
                 attr="TomTom Traffic Feed",
-                name="Live Traffic Layer",
+                name="🚦 TomTom Live Traffic Overlay",
                 overlay=True,
                 control=True
             ).add_to(m)
@@ -174,7 +189,10 @@ with tab1:
                     tooltip=f"<b>{c['Corridor Name']}</b><br>Status: {c['Flow Status']}<br>Speed: {c['Est Speed']}"
                 ).add_to(m)
             
-        st_folium(m, width=820, height=520)
+        # Enable Layer Control (Layer Switcher at top-right)
+        folium.LayerControl().add_to(m)
+
+        st_folium(m, width=820, height=530)
 
     with col_info:
         st.subheader("School Road Metrics")
@@ -187,7 +205,7 @@ with tab1:
         * 🟡 **YELLOW:** Moderate Density (20 - 35 km/h)
         * 🔴 **RED:** Heavy Congestion (< 20 km/h)
         
-        *🏫 **School Peak Hours:** 07:00-09:00 & 15:00-18:00*
+        *💡 오른쪽 상단 **레이어 아이콘**을 클릭하면 **위성 지도**로 전환할 수 있습니다.*
         """)
 
 # ==========================================
@@ -233,12 +251,18 @@ with tab2:
                 m3.metric("Traffic Delay", f"+{delay_min} mins")
                 m4.metric("Avg Speed", f"{avg_speed} km/h")
                 
-                # Render Route Map
+                # Render Route Map with Google Maps Tiles
                 route_map = folium.Map(
                     location=[(orig_coords[0]+dest_coords[0])/2, (orig_coords[1]+dest_coords[1])/2],
                     zoom_start=14,
-                    tiles="cartodbpositron"
+                    tiles=None
                 )
+                
+                folium.TileLayer(
+                    tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+                    attr="Google Maps",
+                    name="Google Maps"
+                ).add_to(route_map)
                 
                 raw_coords = route_data["geometry"]["coordinates"]
                 poly_coords = [[c[1], c[0]] for c in raw_coords]
